@@ -33,34 +33,31 @@ async def get_index():
     """Serve the index.html file"""
     return FileResponse("static/index.html")
 
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await connection_manager.connect(websocket=websocket)
-    audio_buffer = AudioBuffer()
+    audio_buffer = AudioBuffer()  # Initialize a new audio buffer for each connection
 
     try:
         while True:
-            message = await websocket.receive()
-            # print(message)
-            # print(message.text)
-            # server_response = message
-            # print(message)
-            # await websocket.send_json({
-            #     'type': 'msg',
-            #     'message': 'heeellloo!'
-            # })
-            if message["type"] == "websocket.receive":
-                if "bytes" in message:
-                    # incoming audio buffer
-                    audio_buffer.write(message["bytes"])
-                elif "text" in message:
-                    try:
+            try:
+                message = await websocket.receive()  # Wait for incoming WebSocket messages
+
+                if message["type"] == "websocket.receive":
+                    if "bytes" in message:
+                        # Write the incoming audio bytes to the buffer
+                        audio_buffer.write(message["bytes"])
+
+                    elif "text" in message:
                         control = json.loads(message['text'])
                         if control.get('type') == 'end_stream':
+                            # The stream has ended, convert buffered audio to a WAV file
                             wav_file = audio_buffer.get_wav_file()
+                            logging.info(f"Audio saved to file: {wav_file}")
 
                             try:
-                                # transcription
+                                # Perform transcription
                                 user_input = transcribe_audio(audio_file_path=wav_file)
 
                                 if not user_input:
@@ -68,13 +65,13 @@ async def websocket_endpoint(websocket: WebSocket):
                                         'type': 'error',
                                         'message': 'No transcription available'
                                     })
-
-                                logging.info(Fore.GREEN + f"Transcription: {user_input}" + Fore.RESET)
-                                
-                                await websocket.send_json({
-                                    'type': 'transcription',
-                                    'text': user_input
-                                })
+                                else:
+                                    logging.info(Fore.GREEN + f"Transcription: {user_input}" + Fore.RESET)
+                                    
+                                    await websocket.send_json({
+                                        'type': 'transcription',
+                                        'text': user_input
+                                    })
 
                             except Exception as e:
                                 logging.error(f"Processing error: {e}")
@@ -82,26 +79,19 @@ async def websocket_endpoint(websocket: WebSocket):
                                     'type': 'error',
                                     'message': str(e)
                                 })
-                            
-                            # Reset audio buffer for next interaction
+
+                            # Reset the audio buffer after each full interaction
                             audio_buffer = AudioBuffer()
 
-
-                    except json.JSONDecodeError:
-                        logging.error("Invalid control message format")
-                        continue
-
-    
-    except WebSocketDisconnect:
-        # Handle disconnection
-        logging.info("Client disconnected")
-        await connection_manager.disconnect(websocket=websocket)
+            except WebSocketDisconnect:
+                logging.info("Client disconnected")
+                break  # Break the loop and stop receiving when the client disconnects
 
     except Exception as e:
-        logging.error(f"websocket err: {e}")
+        logging.error(f"WebSocket error: {e}")
         await connection_manager.disconnect(websocket=websocket)
 
-
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8888)

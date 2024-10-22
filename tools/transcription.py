@@ -3,14 +3,15 @@ from utils import Config
 import logging
 
 def transcribe_audio(audio_file_path):
+    # print("inside transcribe_audio_function"+audio_file_path)
     client = Groq(api_key=Config.GROQ_API_KEY)
     
     try:
         with open(audio_file_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
-                model="distil-whisper-large-v3-en",
+                model="whisper-large-v3",
                 file=audio_file,
-                language='en'
+                language='en',
             )
         
         # Log the entire response to inspect it

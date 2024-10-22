@@ -1,431 +1,124 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Recording Client</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .status {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .connected {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .recording {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #startRecording {
-            background-color: #28a745;
-            color: white;
-        }
-        #stopRecording {
-            background-color: #dc3545;
-            color: white;
-        }
-        #reconnect {
-            background-color: #007bff;
-            color: white;
-        }
-        .transcription {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #e9ecef;
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Voice Recording Client</h1>
-        <div id="connectionStatus" class="status disconnected">Disconnected</div>
-        <div>
-            <button id="startRecording" disabled>Start Recording</button>
-            <button id="stopRecording" disabled>Stop Recording</button>
-            <button id="reconnect">Reconnect</button>
-        </div>
-        <div id="recordingStatus" class="status"></div>
-        <div id="transcriptionResult" class="transcription"></div>
-    </div>
-
-    <script>
-        let ws;
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-
-        const startRecordingBtn = document.getElementById('startRecording');
-        const stopRecordingBtn = document.getElementById('stopRecording');
-        const reconnectBtn = document.getElementById('reconnect');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const recordingStatus = document.getElementById('recordingStatus');
-        const transcriptionResult = document.getElementById('transcriptionResult');
-
-        function connectWebSocket() {
-            ws = new WebSocket('ws://localhost:8888/ws');
-
-            ws.onopen = () => {
-                connectionStatus.textContent = 'Connected';
-                connectionStatus.className = 'status connected';
-                startRecordingBtn.disabled = false;
-            };
-
-            ws.onclose = () => {
-                connectionStatus.textContent = 'Disconnected';
-                connectionStatus.className = 'status disconnected';
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = true;
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket Error:', error);
-                connectionStatus.textContent = 'Connection Error';
-                connectionStatus.className = 'status disconnected';
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const response = JSON.parse(event.data);
-                    if (response.type === 'transcription') {
-                        transcriptionResult.textContent = `Transcription: ${response.text}`;
-                    } else if (response.type === 'error') {
-                        transcriptionResult.textContent = `Error: ${response.message}`;
-                    }
-                } catch (error) {
-                    console.error('Error parsing message:', error);
-                }
-            };
-        }
-
-        async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                        // Send the audio chunk to the server
-                        if (ws.readyState === WebSocket.OPEN) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                                ws.send(reader.result);
-                            };
-                            reader.readAsArrayBuffer(event.data);
-                        }
-                    }
-                };
-
-                mediaRecorder.onstop = () => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ type: 'end_stream' }));
-                    }
-                    stream.getTracks().forEach(track => track.stop());
-                };
-
-                mediaRecorder.start(250); // Collect data every 250ms
-                isRecording = true;
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = false;
-                recordingStatus.textContent = 'Recording...';
-                recordingStatus.className = 'status recording';
-            } catch (error) {
-                console.error('Error starting recording:', error);
-                recordingStatus.textContent = `Recording Error: ${error.message}`;
-            }
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                startRecordingBtn.disabled = false;
-                stopRecordingBtn.disabled = true;
-                recordingStatus.textContent = 'Recording stopped';
-                recordingStatus.className = 'status';
-            }
-        }
-
-        // Event listeners
-        startRecordingBtn.addEventListener('click', startRecording);
-        stopRecordingBtn.addEventListener('click', stopRecording);
-        reconnectBtn.addEventListener('click', connectWebSocket);
-
-        // Initial connection
-        connectWebSocket();
-    </script>
-</body>
-</html> -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Recording Client</title>
+    <title>Voice Assistant Client</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
         }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .status {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .connected {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .recording {
-            background-color: #fff3cd;
-            color: #856404;
+        h1 {
+            color: #333;
         }
         button {
             padding: 10px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 4px;
+            font-size: 18px;
+            margin: 10px;
             cursor: pointer;
-            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
         }
         button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        #startRecording {
-            background-color: #28a745;
-            color: white;
-        }
-        #stopRecording {
-            background-color: #dc3545;
-            color: white;
-        }
-        #reconnect {
-            background-color: #007bff;
-            color: white;
+            background-color: #ccc;
         }
         .transcription {
             margin-top: 20px;
-            padding: 10px;
-            background-color: #e9ecef;
-            border-radius: 4px;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 300px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Voice Recording Client</h1>
-        <div id="browserSupport"></div>
-        <div id="connectionStatus" class="status disconnected">Disconnected</div>
-        <div>
-            <button id="startRecording" disabled>Start Recording</button>
-            <button id="stopRecording" disabled>Stop Recording</button>
-            <button id="reconnect">Reconnect</button>
-        </div>
-        <div id="recordingStatus" class="status"></div>
-        <div id="transcriptionResult" class="transcription"></div>
-    </div>
+
+    <h1>Voice Assistant</h1>
+    <button id="startButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+
+    <div id="transcription" class="transcription">Your transcription will appear here...</div>
 
     <script>
-        let ws;
+        let socket;
         let mediaRecorder;
         let audioChunks = [];
-        let isRecording = false;
+        const startButton = document.getElementById("startButton");
+        const stopButton = document.getElementById("stopButton");
+        const transcriptionDiv = document.getElementById("transcription");
 
-        const startRecordingBtn = document.getElementById('startRecording');
-        const stopRecordingBtn = document.getElementById('stopRecording');
-        const reconnectBtn = document.getElementById('reconnect');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const recordingStatus = document.getElementById('recordingStatus');
-        const transcriptionResult = document.getElementById('transcriptionResult');
-        const browserSupport = document.getElementById('browserSupport');
+        startButton.addEventListener("click", async () => {
+            socket = new WebSocket("ws://localhost:8888/ws");
 
-        // Check browser support for required APIs
-        function checkBrowserSupport() {
-            let error = '';
-            
-            // Check WebSocket support
-            if (!('WebSocket' in window)) {
-                error += 'WebSocket is not supported. ';
-            }
+            socket.onopen = () => {
+                console.log("WebSocket connection established.");
+                startRecording();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            };
 
-            // Check MediaRecorder support
-            if (!('MediaRecorder' in window)) {
-                error += 'MediaRecorder is not supported. ';
-            }
-
-            // Check getUserMedia support
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                error += 'getUserMedia is not supported. ';
-            }
-
-            if (error) {
-                browserSupport.innerHTML = `<div class="error">Your browser doesn't support required features: ${error}</div>`;
-                startRecordingBtn.disabled = true;
-                return false;
-            }
-            
-            return true;
-        }
-
-        function connectWebSocket() {
-            ws = new WebSocket('ws://localhost:8888/ws');
-
-            ws.onopen = () => {
-                connectionStatus.textContent = 'Connected';
-                connectionStatus.className = 'status connected';
-                if (checkBrowserSupport()) {
-                    startRecordingBtn.disabled = false;
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'transcription') {
+                    transcriptionDiv.textContent = data.text;
+                } else if (data.type === 'error') {
+                    transcriptionDiv.textContent = `Error: ${data.message}`;
                 }
             };
 
-            ws.onclose = () => {
-                connectionStatus.textContent = 'Disconnected';
-                connectionStatus.className = 'status disconnected';
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = true;
+            socket.onclose = () => {
+                console.log("WebSocket connection closed.");
             };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket Error:', error);
-                connectionStatus.textContent = 'Connection Error';
-                connectionStatus.className = 'status disconnected';
+            socket.onerror = (error) => {
+                console.error("WebSocket error:", error);
             };
+        });
 
-            ws.onmessage = (event) => {
-                try {
-                    const response = JSON.parse(event.data);
-                    if (response.type === 'transcription') {
-                        transcriptionResult.textContent = `Transcription: ${response.text}`;
-                    } else if (response.type === 'error') {
-                        transcriptionResult.textContent = `Error: ${response.message}`;
-                    }
-                } catch (error) {
-                    console.error('Error parsing message:', error);
-                }
-            };
-        }
+        stopButton.addEventListener("click", () => {
+            stopRecording();
+            startButton.disabled = false;
+            stopButton.disabled = true;
+        });
 
         async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: true,
-                    video: false
-                });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
 
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'audio/webm'
-                });
-
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                        // Send the audio chunk to the server
-                        if (ws.readyState === WebSocket.OPEN) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                                ws.send(reader.result);
-                            };
-                            reader.readAsArrayBuffer(event.data);
-                        }
-                    }
-                };
-
-                mediaRecorder.onstop = () => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ type: 'end_stream' }));
-                    }
-                    stream.getTracks().forEach(track => track.stop());
-                };
-
-                mediaRecorder.start(250); // Collect data every 250ms
-                isRecording = true;
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = false;
-                recordingStatus.textContent = 'Recording...';
-                recordingStatus.className = 'status recording';
-            } catch (error) {
-                console.error('Error starting recording:', error);
-                recordingStatus.innerHTML = `<div class="error">Recording Error: ${error.message}</div>`;
-                if (error.name === 'NotAllowedError') {
-                    recordingStatus.innerHTML += '<div>Please allow microphone access and try again.</div>';
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+                // Send audio chunk immediately after it's available
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(event.data);
                 }
-            }
+            };
+
+            mediaRecorder.start(250); // Record in chunks every 250ms
         }
 
         function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                startRecordingBtn.disabled = false;
-                stopRecordingBtn.disabled = true;
-                recordingStatus.textContent = 'Recording stopped';
-                recordingStatus.className = 'status';
-            }
-        }
+            mediaRecorder.stop();
 
-        // Event listeners
-        startRecordingBtn.addEventListener('click', startRecording);
-        stopRecordingBtn.addEventListener('click', stopRecording);
-        reconnectBtn.addEventListener('click', connectWebSocket);
+            // Inform server that recording has ended
+            socket.send(JSON.stringify({ type: 'end_stream' }));
 
-        // Check browser support before initial connection
-        if (checkBrowserSupport()) {
-            // Initial connection
-            connectWebSocket();
+            // Close WebSocket connection after a short delay
+            setTimeout(() => {
+                socket.close();
+            }, 500); // Adjust delay if necessary
         }
     </script>
+
 </body>
 </html>
