@@ -2,6 +2,7 @@ import logging
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from services.websocket_manager import WSConnectionManager
+from services.audio_buffer import AudioBuffer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -16,6 +17,7 @@ app.add_middleware(
 )
 
 connection_manager = WSConnectionManager()
+audio_buffer = AudioBuffer()
 
 if __name__ == "__main__":
     import uvicorn
