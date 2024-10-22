@@ -17,7 +17,21 @@ app.add_middleware(
 )
 
 connection_manager = WSConnectionManager()
-audio_buffer = AudioBuffer()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await connection_manager.connect(websocket=websocket)
+    audio_buffer = AudioBuffer()
+
+    try:
+        while True:
+            message = await websocket.receive()
+            print(message)
+
+    except Exception as e:
+        logging.error(f"websocket err: {e}")
+        connection_manager.disconnect(websocket=websocket)
+
 
 if __name__ == "__main__":
     import uvicorn
