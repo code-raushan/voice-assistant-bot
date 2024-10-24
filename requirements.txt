@@ -30,3 +30,5 @@ sounddevice
 cartesia
 soundfile
 websockets
+PyAudio==0.2.14
+pydub

@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse
 from services.websocket_manager import WSConnectionManager
 from services.audio_buffer import AudioBuffer
 from tools.transcription import transcribe_audio
+from tools.response import generate_response
+from tools.tts import text_to_speech
+from utils import delete_file
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -37,26 +40,49 @@ async def get_index():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await connection_manager.connect(websocket=websocket)
-    audio_buffer = AudioBuffer()  # Initialize a new audio buffer for each connection
+
+    chat_history = [
+        {"role": "system", "content": """ You are a helpful Assistant called Verbi. 
+         You are friendly and fun and you will help the users with their requests.
+         Your answers are short and concise. """}
+    ]
+    
+    # Create input directory if it doesn't exist
+    input_dir = Path("input")
+    input_dir.mkdir(exist_ok=True)
+    
+    # Initialize audio buffer with path in the input directory
+    audio_buffer = AudioBuffer(output_path=input_dir / "input.wav")
+    message_counter = 0
 
     try:
         while True:
             try:
-                message = await websocket.receive()  # Wait for incoming WebSocket messages
+                message = await websocket.receive()
 
                 if message["type"] == "websocket.receive":
+                    message_counter += 1
+                    logging.info(f"Receiving data chunk {message_counter}")
+                    
                     if "bytes" in message:
                         # Write the incoming audio bytes to the buffer
-                        audio_buffer.write(message["bytes"])
+                        try:
+                            audio_buffer.write(message["bytes"])
+                        except Exception as e:
+                            logging.error(f"Error writing audio chunk: {e}")
+                            await websocket.send_json({
+                                'type': 'error',
+                                'message': 'Failed to process audio chunk'
+                            })
 
                     elif "text" in message:
                         control = json.loads(message['text'])
                         if control.get('type') == 'end_stream':
-                            # The stream has ended, convert buffered audio to a WAV file
-                            wav_file = audio_buffer.get_wav_file()
-                            logging.info(f"Audio saved to file: {wav_file}")
-
                             try:
+                                # Convert buffered audio to WAV file
+                                wav_file = audio_buffer.get_wav_file()
+                                logging.info(f"Audio saved to file: {wav_file}")
+
                                 # Perform transcription
                                 user_input = transcribe_audio(audio_file_path=wav_file)
 
@@ -67,11 +93,32 @@ async def websocket_endpoint(websocket: WebSocket):
                                     })
                                 else:
                                     logging.info(Fore.GREEN + f"Transcription: {user_input}" + Fore.RESET)
-                                    
                                     await websocket.send_json({
                                         'type': 'transcription',
                                         'text': user_input
                                     })
+
+                                chat_history.append({"role": "user", "content": user_input})
+
+                                # Generate response
+                                response_text = generate_response(chat_history=chat_history)
+
+                                chat_history.append({"role": "assistant", "content": response_text})
+
+                                await websocket.send_json({
+                                    'type': 'response',
+                                    'text': response_text
+                                })
+
+                                output_file = 'output.mp3'
+
+                                text_to_speech(text=response_text, output_file=output_file)
+
+                                with open(output_file, 'rb') as audio_file:
+                                    audio_data = audio_file.read()
+                                    await websocket.send_bytes(audio_data)
+
+                                delete_file(output_file)
 
                             except Exception as e:
                                 logging.error(f"Processing error: {e}")
@@ -80,16 +127,15 @@ async def websocket_endpoint(websocket: WebSocket):
                                     'message': str(e)
                                 })
 
-                            # Reset the audio buffer after each full interaction
-                            audio_buffer = AudioBuffer()
+                            # Reset the audio buffer after processing
+                            audio_buffer.reset()
 
             except WebSocketDisconnect:
                 logging.info("Client disconnected")
-                break  # Break the loop and stop receiving when the client disconnects
+                break
 
     except Exception as e:
         logging.error(f"WebSocket error: {e}")
-        await connection_manager.disconnect(websocket=websocket)
 
     
 if __name__ == "__main__":
